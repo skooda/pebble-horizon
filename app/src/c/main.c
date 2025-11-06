@@ -1,35 +1,84 @@
 #include <pebble.h>
 
-static Window *s_window;
-static TextLayer *s_text_layer;
+static Window *_window;
+static Layer *_canvas_layer;
 
+// forward declarations (fixes "not used" / implicit-declaration issues)
+static void _window_load(Window *window);
+static void _window_unload(Window *window);
+
+static int16_t _center_x;
+static int16_t _center_y;
+
+static int16_t _att_x;
+static int16_t _att_y;
+static int16_t _att_z;
+
+//---------------
+// Configurations
+//---------------
+static const uint16_t _circle_radius = 15;
+static const uint16_t _sensitivity = 10;
+
+//---------------
+// Handlers
+///---------------
 static void _handle_click_select(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(s_text_layer, "Select");
+  // Todo: Implement select button functionality
 }
 
 static void _handle_click_up(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(s_text_layer, "Up");
+  // Todo: Implement up button functionality
 }
 
 static void _handle_click_down(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(s_text_layer, "Down");
+  // Todo: Implement down button functionality
 }
 
 static void _handle_accelerometer(AccelData *data, uint32_t num_samples) {
-  static int16_t x = 0, y = 0, z = 0;
+  int32_t sum_x = 0, sum_y = 0, sum_z = 0;
   for (uint32_t i = 0; i < num_samples; i++) {
-    x += data[i].x;
-    y += data[i].y;
-    z += data[i].z;
+    sum_x += data[i].x;
+    sum_y += data[i].y;
+    sum_z += data[i].z;
   }
-  x /= num_samples;
-  y /= num_samples;
-  z /= num_samples;
-  if (x > 2000 || x < -2000 || y > 2000 || y < -2000 || z > 2000 || z < -2000) {
-    text_layer_set_text(s_text_layer, "Shake detected!");
-  }
+  _att_x = sum_x / (int32_t)num_samples;
+  _att_y = sum_y / (int32_t)num_samples;
+  _att_z = sum_z / (int32_t)num_samples;
+
+  layer_mark_dirty(_canvas_layer);
 }
 
+//---------------
+// Drawing
+//---------------
+static void _clear_screen(Layer *layer, GContext *ctx) {
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
+  graphics_context_set_fill_color(ctx, GColorBlack);
+}
+
+static void _draw_circle(Layer *layer, GContext *ctx) {
+  int16_t circle_x = _center_x - (_att_x/_sensitivity);
+  int16_t circle_y = _center_y + (_att_y/_sensitivity);
+
+  graphics_fill_circle(ctx, GPoint(circle_x, circle_y), _circle_radius);
+}
+
+static void _draw_horizon(Layer *layer, GContext *ctx) {
+  int16_t horizon_y = _center_y + (_att_y/_sensitivity);
+  graphics_draw_line(ctx, GPoint(0, horizon_y), GPoint(layer_get_bounds(layer).size.w, horizon_y));
+}
+
+static void _draw(Layer *layer, GContext *ctx) {
+  _clear_screen(layer, ctx);
+  _draw_circle(layer, ctx);
+  _draw_horizon(layer, ctx);
+}
+
+//---------------
+// Initialization
+//---------------
 static void _click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, _handle_click_select);
   window_single_click_subscribe(BUTTON_ID_UP, _handle_click_up);
@@ -38,36 +87,42 @@ static void _click_config_provider(void *context) {
   accel_service_set_sampling_rate(ACCEL_SAMPLING_100HZ);
 }
 
+static void _init(void) {
+  _window = window_create();
+  window_set_click_config_provider(_window, _click_config_provider);
+  window_set_window_handlers(_window, (WindowHandlers) {
+    .load = _window_load,
+    .unload = _window_unload,
+  });
+  const bool animated = true;
+  window_stack_push(_window, animated);
+}
+
 static void _window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
-  s_text_layer = text_layer_create(GRect(0, 72, bounds.size.w, 20));
-  text_layer_set_text(s_text_layer, "Press a button");
-  text_layer_set_text_alignment(s_text_layer, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(s_text_layer));
+  // calculate center of screen
+  _center_x = bounds.size.w / 2;
+  _center_y = bounds.size.h / 2;
+
+  // create full-screen canvas and use update proc to draw circle
+  _canvas_layer = layer_create(bounds);
+  layer_set_update_proc(_canvas_layer, _draw);
+  layer_add_child(window_layer, _canvas_layer);
 }
 
+// Cleanup
 static void _window_unload(Window *window) {
-  text_layer_destroy(s_text_layer);
-}
-
-static void _init(void) {
-  s_window = window_create();
-  window_set_click_config_provider(s_window, _click_config_provider);
-  window_set_window_handlers(s_window, (WindowHandlers) {
-    .load = _window_load,
-    .unload = _window_unload
-  ,
-  });
-  const bool animated = true;
-  window_stack_push(s_window, animated);
+  layer_destroy(_canvas_layer);
+  accel_data_service_unsubscribe();
 }
 
 static void _destroy(void) {
-  window_destroy(s_window);
+  window_destroy(_window);
 }
 
+// Main
 int main(void) {
   _init();
   app_event_loop();
