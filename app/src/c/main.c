@@ -7,6 +7,7 @@ static Layer *_canvas_layer;
 // forward declarations (fixes "not used" / implicit-declaration issues)
 static void _window_load(Window *window);
 static void _window_unload(Window *window);
+static GPoint _translate_point(int16_t x, int16_t y, float angle_rad, int16_t distance);
 
 static int16_t _center_x;
 static int16_t _center_y;
@@ -76,20 +77,49 @@ static void _draw_angled_line(GContext *ctx, float angle_rad, int16_t sx, int16_
   graphics_draw_line(ctx, start, end);
 }
 
+static GPoint _translate_point(int16_t x, int16_t y, float angle_rad, int16_t distance) {
+  return GPoint(
+    x + (int16_t)(distance * cosf(angle_rad)),
+    y + (int16_t)(distance * sinf(angle_rad))
+  );
+}
+
+static void _draw_angled_offset_line(GContext *ctx, float angle_rad, int16_t sx, int16_t sy, int16_t length, int16_t offset) {
+  GPoint start = _translate_point(sx, sy, angle_rad + (PI / 2), offset);
+  GPoint end = GPoint(
+    start.x + (int16_t)(length * cosf(angle_rad)),
+    start.y + (int16_t)(length * sinf(angle_rad))
+  );
+  graphics_draw_line(ctx, start, end);
+}
+  
 static void _draw_horizon(GContext *ctx) {
   int16_t horizon_y = _center_y + (_att_z/_sensitivity);
 
   // Draw horizon line with rotation based on accelerometer data
+  graphics_context_set_stroke_width(ctx, 2);
   _draw_angled_line(ctx, _horizon_angle_rad, _center_x, horizon_y, _display_diameter/2);
   _draw_angled_line(ctx, _horizon_angle_rad+PI, _center_x, horizon_y, _display_diameter/2);
+  graphics_context_set_stroke_width(ctx, 1);
 
   // Draw horizon segments by 30-degree increments
   _draw_angled_line(ctx, _horizon_angle_rad+(PI/6), _center_x, horizon_y, _display_diameter/2);
   _draw_angled_line(ctx, _horizon_angle_rad+(2*PI/6), _center_x, horizon_y, _display_diameter/2);
   _draw_angled_line(ctx, _horizon_angle_rad+(4*PI/6), _center_x, horizon_y, _display_diameter/2);
   _draw_angled_line(ctx, _horizon_angle_rad+(5*PI/6), _center_x, horizon_y, _display_diameter/2);
-  
-}
+
+  // Draw nose attitude horizontal lines
+  _draw_angled_offset_line(ctx, _horizon_angle_rad+PI, _center_x, horizon_y, 10, -25);
+  _draw_angled_offset_line(ctx, _horizon_angle_rad+PI, _center_x, horizon_y, 20, -40);
+  _draw_angled_offset_line(ctx, _horizon_angle_rad, _center_x, horizon_y, 10, -25);
+  _draw_angled_offset_line(ctx, _horizon_angle_rad, _center_x, horizon_y, 20, -40);
+ 
+  _draw_angled_offset_line(ctx, _horizon_angle_rad+PI, _center_x, horizon_y, 10, 25);
+  _draw_angled_offset_line(ctx, _horizon_angle_rad+PI, _center_x, horizon_y, 20, 40);
+  _draw_angled_offset_line(ctx, _horizon_angle_rad, _center_x, horizon_y, 10, 25);
+  _draw_angled_offset_line(ctx, _horizon_angle_rad, _center_x, horizon_y, 20, 40);
+ 
+} 
 
 static void _draw(Layer *layer, GContext *ctx) {
   _clear_screen(layer, ctx);
