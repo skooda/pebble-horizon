@@ -15,10 +15,12 @@ static int16_t _att_x;
 static int16_t _att_y;
 static int16_t _att_z;
 
+static float _horizon_angle_rad;
+
 //---------------
 // Configurations
 //---------------
-static const uint16_t _circle_radius = 15;
+static const uint16_t _display_diameter = 140;
 static const uint16_t _sensitivity = 10;
 static const float PI = 3.14159265f;
 
@@ -47,7 +49,10 @@ static void _handle_accelerometer(AccelData *data, uint32_t num_samples) {
   _att_x = sum_x / (int32_t)num_samples;
   _att_y = sum_y / (int32_t)num_samples;
   _att_z = sum_z / (int32_t)num_samples;
-
+  
+  int16_t horizon_angle = (-_att_x / 16);
+  _horizon_angle_rad = horizon_angle * (PI / 180.0f);
+  
   layer_mark_dirty(_canvas_layer);
 }
 
@@ -60,40 +65,35 @@ static void _clear_screen(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorBlack);
 }
 
-static void _draw_circle(Layer *layer, GContext *ctx) {
-  int16_t circle_x = _center_x - (_att_x/_sensitivity);
-  int16_t circle_y = _center_y + (_att_y/_sensitivity);
 
-  graphics_fill_circle(ctx, GPoint(circle_x, circle_y), _circle_radius);
-}
-
-static void _draw_angled_line(Layer *layer, GContext *ctx, float angle_rad, int16_t cx, int16_t cy) {
-  // Draw a line at a specific angle from the center
-  int16_t length = 100; // Length of the line
-  GPoint start = GPoint(
-    cx - (int16_t)(length * cosf(angle_rad)),
-    cy - (int16_t)(length * sinf(angle_rad))
-  );
+static void _draw_angled_line(GContext *ctx, float angle_rad, int16_t sx, int16_t sy, int16_t length) {
+  // Draw a line at a specific angle
+  GPoint start = GPoint(sx, sy);
   GPoint end = GPoint(
-    cx + (int16_t)(length * cosf(angle_rad)),
-    cy + (int16_t)(length * sinf(angle_rad))
+    sx + (int16_t)(length * cosf(angle_rad)),
+    sy + (int16_t)(length * sinf(angle_rad))
   );
   graphics_draw_line(ctx, start, end);
 }
 
-static void _draw_horizon(Layer *layer, GContext *ctx) {
+static void _draw_horizon(GContext *ctx) {
   int16_t horizon_y = _center_y + (_att_z/_sensitivity);
-  int16_t horizon_angle = (-_att_x / 16);
-  int16_t horizon_angle_rad = horizon_angle * (PI / 180.0f);
+
   // Draw horizon line with rotation based on accelerometer data
-  _draw_angled_line(layer, ctx, horizon_angle * (PI / 180.0f), _center_x, horizon_y);
+  _draw_angled_line(ctx, _horizon_angle_rad, _center_x, horizon_y, _display_diameter/2);
+  _draw_angled_line(ctx, _horizon_angle_rad+PI, _center_x, horizon_y, _display_diameter/2);
+
+  // Draw horizon segments by 30-degree increments
+  _draw_angled_line(ctx, _horizon_angle_rad+(PI/6), _center_x, horizon_y, _display_diameter/2);
+  _draw_angled_line(ctx, _horizon_angle_rad+(2*PI/6), _center_x, horizon_y, _display_diameter/2);
+  _draw_angled_line(ctx, _horizon_angle_rad+(4*PI/6), _center_x, horizon_y, _display_diameter/2);
+  _draw_angled_line(ctx, _horizon_angle_rad+(5*PI/6), _center_x, horizon_y, _display_diameter/2);
   
 }
 
 static void _draw(Layer *layer, GContext *ctx) {
   _clear_screen(layer, ctx);
-  _draw_circle(layer, ctx);
-  _draw_horizon(layer, ctx);
+  _draw_horizon(ctx);
 }
 
 //---------------
