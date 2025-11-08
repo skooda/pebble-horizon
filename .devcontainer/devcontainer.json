@@ -31,7 +31,7 @@
     }
   },
 
-  "workspaceFolder": "/workspaces/fly-pebble-fly/app",
+  "workspaceFolder": "/workspaces/pebble-horizon/app",
   "containerEnv": {
     "LOCALWORKSPACEFOLDERBASENAME": "${localWorkspaceFolderBasename}",
     "LOCALWORKSPACEFOLDER": "${localWorkspaceFolder}",
