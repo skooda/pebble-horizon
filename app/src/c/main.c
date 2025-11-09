@@ -126,20 +126,23 @@ static GPoint rotate_point(GPoint p, float angle_rad) {
   return GPoint(x_new + _center_x, y_new + _center_y);
 }
 
-static void _draw_filled_triangle(GContext *ctx, GPoint p1, GPoint p2, GPoint p3) {
-  GPathInfo triangle_info = {
-    .num_points = 3,
-    .points = (GPoint []) { p1, p2, p3 }
+static void _draw_filled_polygon(GContext *ctx, GPoint *points, int num_points) {
+  // Zajistíme, že polygon má aspoň 3 body
+  if(num_points < 3) return;
+
+  GPathInfo polygon_info = {
+    .num_points = num_points,
+    .points = points
   };
-  GPath *triangle_path = gpath_create(&triangle_info);
+  GPath *polygon_path = gpath_create(&polygon_info);
 
   graphics_context_set_fill_color(ctx, GColorBlack);
-  gpath_draw_filled(ctx, triangle_path);
+  gpath_draw_filled(ctx, polygon_path);
 
   graphics_context_set_stroke_color(ctx, GColorBlack);
-  gpath_draw_outline(ctx, triangle_path);
+  gpath_draw_outline(ctx, polygon_path);
 
-  gpath_destroy(triangle_path);
+  gpath_destroy(polygon_path);
 }
 
 static void _draw_crown(GContext *ctx) {
@@ -156,7 +159,8 @@ static void _draw_crown(GContext *ctx) {
   graphics_draw_line(ctx, rotated_top, rotated_left);
   graphics_draw_line(ctx, rotated_top, rotated_right);
   graphics_draw_line(ctx, rotated_left, rotated_right);
-  _draw_filled_triangle(ctx, rotated_top, rotated_left, rotated_right);
+
+  _draw_filled_polygon(ctx, (GPoint[]) {rotated_top, rotated_left, rotated_right}, 3);
 }
 
 static void _draw_border(GContext *ctx) {
@@ -193,6 +197,86 @@ static void _draw_border(GContext *ctx) {
   _draw_angled_line(ctx, PI/18*26, _center_x, _center_y, border_offset+3, _border_width*0.4);
   _draw_angled_line(ctx, PI/18*28, _center_x, _center_y, border_offset+3, _border_width*0.4);
   _draw_angled_line(ctx, PI/18*29, _center_x, _center_y, border_offset+3, _border_width*0.4);
+
+  // Draw pointer needle
+  int16_t ratio=_display_diameter/65;
+
+  GPoint needle[] = {
+    GPoint(-10*ratio+_center_x,22*ratio+_center_y),
+    GPoint(-1*ratio+_center_x,11*ratio+_center_y),
+    GPoint(-1*ratio+_center_x,8*ratio+_center_y),
+    GPoint(-5*ratio+_center_x,8*ratio+_center_y),
+    GPoint(-7*ratio+_center_x,7*ratio+_center_y),
+    GPoint(-8*ratio+_center_x,5*ratio+_center_y),
+    GPoint(-8*ratio+_center_x,1*ratio+_center_y),
+    GPoint(-17*ratio+_center_x,1*ratio+_center_y),
+    GPoint(-17*ratio+_center_x,0*ratio+_center_y),
+    GPoint(-7*ratio+_center_x,0*ratio+_center_y),
+    GPoint(-7*ratio+_center_x,4*ratio+_center_y),
+    GPoint(-6*ratio+_center_x,6*ratio+_center_y),
+    GPoint(-4*ratio+_center_x,7*ratio+_center_y),
+    GPoint(-1*ratio+_center_x,7*ratio+_center_y),
+    GPoint(-1*ratio+_center_x,2*ratio+_center_y),
+    GPoint(-2*ratio+_center_x,1*ratio+_center_y),
+    GPoint(-2*ratio+_center_x,0*ratio+_center_y),
+    GPoint(-1*ratio+_center_x,-1*ratio+_center_y),
+    GPoint(0*ratio+_center_x,-1*ratio+_center_y),
+    GPoint(1*ratio+_center_x,0*ratio+_center_y),
+    GPoint(1*ratio+_center_x,1*ratio+_center_y),
+    GPoint(0*ratio+_center_x,2*ratio+_center_y),
+    GPoint(0*ratio+_center_x,7*ratio+_center_y),
+    GPoint(3*ratio+_center_x,7*ratio+_center_y),
+    GPoint(5*ratio+_center_x,6*ratio+_center_y),
+    GPoint(6*ratio+_center_x,4*ratio+_center_y),
+    GPoint(6*ratio+_center_x,0*ratio+_center_y),
+    GPoint(16*ratio+_center_x,0*ratio+_center_y),
+    GPoint(16*ratio+_center_x,1*ratio+_center_y),
+    GPoint(7*ratio+_center_x,1*ratio+_center_y),
+    GPoint(7*ratio+_center_x,5*ratio+_center_y),
+    GPoint(6*ratio+_center_x,7*ratio+_center_y),
+    GPoint(4*ratio+_center_x,8*ratio+_center_y),
+    GPoint(0*ratio+_center_x,8*ratio+_center_y),
+    GPoint(0*ratio+_center_x,11*ratio+_center_y),
+    GPoint(9*ratio+_center_x,22*ratio+_center_y),
+    GPoint(29*ratio+_center_x,22*ratio+_center_y),
+    GPoint(29*ratio+_center_x,43*ratio+_center_y),
+    GPoint(-30*ratio+_center_x,42*ratio+_center_y),
+    GPoint(-30*ratio+_center_x,22*ratio+_center_y)
+  };
+  _draw_filled_polygon(ctx, needle, 40);
+  
+  // Draw around
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_stroke_width(ctx, 1);
+  graphics_draw_circle(ctx, GPoint(_center_x, _center_y), _display_diameter/2+3);
+
+  // Draw calibration knob
+  graphics_draw_circle(ctx, GPoint(_center_x, _display_diameter*1.05), _display_diameter*0.08);
+
+  // Draw bolts
+  int16_t bolt_size = _display_diameter*0.1;
+
+  int16_t bolt_x, bolt_y;
+  bolt_x = _center_x - _display_diameter/2.1;
+  bolt_y = _center_y - _display_diameter/2.1;
+  graphics_draw_circle(ctx, GPoint(bolt_x, bolt_y), bolt_size/2+1);
+  _draw_angled_line(ctx, PI*0.3, bolt_x, bolt_y, -bolt_size/2, bolt_size);
+
+  bolt_x = _center_x + _display_diameter/2.1;
+  bolt_y = _center_y - _display_diameter/2.1;
+  graphics_draw_circle(ctx, GPoint(bolt_x, bolt_y), bolt_size/2+1);
+  _draw_angled_line(ctx, PI*1.2, bolt_x, bolt_y, -bolt_size/2, bolt_size);
+
+  bolt_x = _center_x - _display_diameter/2.1;
+  bolt_y = _center_y + _display_diameter/2.1;
+  graphics_draw_circle(ctx, GPoint(bolt_x, bolt_y), bolt_size/2+1);
+  _draw_angled_line(ctx, PI*1.7, bolt_x, bolt_y, -bolt_size/2, bolt_size);
+
+  bolt_x = _center_x + _display_diameter/2.1;
+  bolt_y = _center_y + _display_diameter/2.1;
+  graphics_draw_circle(ctx, GPoint(bolt_x, bolt_y), bolt_size/2+1);
+  _draw_angled_line(ctx, PI*0.6, bolt_x, bolt_y, -bolt_size/2, bolt_size);
+
 
 
 } 
